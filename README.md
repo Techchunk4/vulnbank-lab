@@ -159,6 +159,35 @@ docker-compose up -d
 # 4. Access VulnBank
 firefox http://localhost:8000
 ```
+## Project Screenshots
+
+### Login Page
+![VulnBank Login](screenshots/login.png)
+*VulnBank authentication page with intentional vulnerabilities*
+
+### Dashboard
+![User Dashboard](screenshots/dashboard.png)
+*User account dashboard showing balance and recent transactions*
+
+### Transfer Interface
+![Money Transfer](screenshots/transfer.png)
+*Transfer money interface vulnerable to CSRF and race conditions*
+
+### Wazuh Monitoring
+![Wazuh Dashboard](screenshots/wazuh-monitoring.png)
+*Real-time security monitoring showing detected attacks*
+
+### Docker Containers
+![Container Status](screenshots/docker-containers.png)
+*VulnBank running in Docker containers*
+
+### SQL Injection Detection
+![SQL Injection Alert](screenshots/telegram-bot.png)
+*Wazuh alert triggered by SQL injection attempt*
+
+### Brute Force Detection
+![Brute Force Alert](screenshots/n8n-admin.png)
+*Multiple failed login attempts detected by Wazuh*
 
 **Default Login**: `admin` / `admin123`
 
@@ -468,6 +497,268 @@ Add VulnBank detection rules:
 sudo systemctl restart wazuh-manager
 ```
 
+---
+## N8N Automated Monitoring & Recovery
+
+Automated system administration using N8N workflows for monitoring VulnBank uptime and automated recovery.
+
+### Architecture
+
+N8N workflow monitors VulnBank health and automatically restarts containers when issues are detected, either on schedule or via chat triggers.
+
+### Prerequisites
+```bash
+# N8N is already running on your system
+docker ps | grep n8n
+
+# Access N8N at: http://localhost:5678
+```
+
+### Workflow 1: Scheduled Health Check & Auto-Restart
+
+**Purpose**: Check VulnBank health every 5 minutes and restart if down
+
+**N8N Workflow Nodes**:
+
+1. **Schedule Trigger** (Every 5 minutes)
+```
+   Cron: */5 * * * *
+```
+
+2. **Execute Command: Check VulnBank Status**
+```bash
+   docker ps --filter "name=vulnbank-lab" --format "{{.Names}}|{{.Status}}" | grep -c "Up"
+```
+
+3. **IF Node: Check if containers are running**
+   - Condition: `{{ $json.stdout }} < 2`
+
+4. **Execute Command: Restart VulnBank** (if down)
+```bash
+   cd /home/abdelkader-work-station/Documents/vulnbank-lab && docker-compose restart
+```
+
+5. **HTTP Request: Check Web App Response**
+```
+   URL: http://localhost:8000
+   Method: GET
+```
+
+6. **Execute Command: Send Alert to Wazuh**
+```bash
+   logger -t n8n-vulnbank "VulnBank containers restarted automatically by N8N"
+```
+
+7. **Webhook: Notify Admin** (optional)
+```json
+   {
+     "status": "restarted",
+     "timestamp": "{{ $now }}",
+     "service": "VulnBank"
+   }
+```
+
+### Workflow 2: Chat-Triggered Container Management
+
+**Purpose**: Restart or check VulnBank status via Telegram/Slack/Discord
+
+**N8N Workflow Nodes**:
+
+1. **Telegram Trigger** (or Slack/Discord)
+   - Command: `/vulnbank status` or `/vulnbank restart`
+
+2. **Switch Node: Parse Command**
+   - Route 0: status
+   - Route 1: restart
+   - Route 2: logs
+
+3. **Execute Command: Get Status**
+```bash
+   docker ps --filter "name=vulnbank-lab" --format "Name: {{.Names}}\nStatus: {{.Status}}\nPorts: {{.Ports}}"
+```
+
+4. **Execute Command: Restart Containers**
+```bash
+   cd /home/abdelkader-work-station/Documents/vulnbank-lab && docker-compose restart && sleep 5 && docker ps --filter "name=vulnbank-lab"
+```
+
+5. **Execute Command: Get Recent Logs**
+```bash
+   docker logs --tail 20 vulnbank-lab-web-1
+```
+
+6. **Send Response to Chat**
+```
+   VulnBank Status:
+   {{ $json.stdout }}
+```
+
+### Workflow 3: Security Event Response
+
+**Purpose**: Auto-respond to Wazuh security alerts
+
+**N8N Workflow Nodes**:
+
+1. **Webhook Trigger** 
+```
+   URL: http://localhost:5678/webhook/wazuh-alert
+   Method: POST
+```
+
+2. **Function Node: Parse Wazuh Alert**
+```javascript
+   const ruleId = $input.item.json.rule.id;
+   const level = $input.item.json.rule.level;
+   const description = $input.item.json.rule.description;
+   
+   return {
+     json: {
+       ruleId: ruleId,
+       level: level,
+       description: description,
+       shouldRestart: level >= 12
+     }
+   };
+```
+
+3. **IF Node: Critical Alert?**
+   - Condition: `{{ $json.level }} >= 12`
+
+4. **Execute Command: Isolate Container** (critical alerts)
+```bash
+   docker network disconnect vulnbank-lab_bank_network vulnbank-lab-web-1
+```
+
+5. **Execute Command: Take Snapshot**
+```bash
+   docker commit vulnbank-lab-web-1 vulnbank-forensics:$(date +%Y%m%d-%H%M%S)
+```
+
+6. **Telegram/Slack Notification**
+```
+   🚨 CRITICAL SECURITY ALERT
+   Rule: {{ $json.ruleId }}
+   Description: {{ $json.description }}
+   Action: Container isolated for forensics
+```
+
+### Setup Instructions
+
+#### 1. Configure N8N to Access Docker
+```bash
+# Give N8N container docker socket access
+docker stop n8n
+docker run -d \
+  --name n8n \
+  -p 5678:5678 \
+  -v ~/.n8n:/home/node/.n8n \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  --restart unless-stopped \
+  docker.n8n.io/n8nio/n8n
+```
+
+#### 2. Import Workflows
+
+Access N8N at `http://localhost:5678` and import these workflows:
+```bash
+# Download workflow templates (create these JSON files)
+curl -o vulnbank-health-monitor.json https://your-repo/n8n-workflows/health-monitor.json
+curl -o vulnbank-chat-control.json https://your-repo/n8n-workflows/chat-control.json
+```
+
+#### 3. Configure Wazuh Integration
+
+Add webhook to Wazuh configuration on the **Manager**:
+```bash
+# On Wazuh Manager
+sudo nano /var/ossec/etc/ossec.conf
+```
+
+Add integration:
+```xml
+<integration>
+  <name>custom-webhook</name>
+  <hook_url>http://your-workstation-ip:5678/webhook/wazuh-alert</hook_url>
+  <level>10</level>
+  <rule_id>100010,100011,100041,100051</rule_id>
+  <alert_format>json</alert_format>
+</integration>
+```
+
+#### 4. Test the Integration
+```bash
+# Test health check workflow manually
+curl http://localhost:5678/webhook-test/vulnbank-health
+
+# Simulate container failure
+docker stop vulnbank-lab-web-1
+
+# Wait 5 minutes - N8N should auto-restart
+# Or trigger manually via chat: /vulnbank restart
+
+# Verify restart
+docker ps --filter "name=vulnbank-lab"
+```
+
+### Monitoring Dashboard
+
+Create a monitoring script that shows N8N + VulnBank + Wazuh status:
+```bash
+nano ~/monitor-complete-stack.sh
+```
+```bash
+#!/bin/bash
+
+echo "=================================="
+echo "Complete Stack Status"
+echo "=================================="
+echo ""
+
+echo "1. VulnBank Containers:"
+docker ps --filter "name=vulnbank-lab" --format "  {{.Names}} - {{.Status}}"
+echo ""
+
+echo "2. N8N Status:"
+docker ps --filter "name=n8n" --format "  {{.Names}} - {{.Status}}"
+echo ""
+
+echo "3. Wazuh Agent:"
+sudo systemctl status wazuh-agent --no-pager | grep "Active:"
+echo ""
+
+echo "4. Recent N8N Executions:"
+# Check N8N logs for recent workflow runs
+docker logs --tail 10 n8n 2>&1 | grep -E "Workflow|execution|started"
+echo ""
+
+echo "5. Recent Wazuh Alerts:"
+sudo tail -5 /var/ossec/logs/alerts/alerts.log 2>/dev/null | grep -E "Rule|Description" || echo "  No recent alerts"
+echo ""
+
+echo "=================================="
+```
+```bash
+chmod +x ~/monitor-complete-stack.sh
+~/monitor-complete-stack.sh
+```
+
+### Benefits
+
+- ✅ **Automated Recovery**: VulnBank auto-restarts on failure
+- ✅ **Chat Control**: Manage VulnBank from Telegram/Slack
+- ✅ **Security Response**: Auto-isolate containers on critical alerts
+- ✅ **Uptime Monitoring**: 24/7 health checks
+- ✅ **Forensics**: Auto-snapshot on security incidents
+- ✅ **DevOps Integration**: Full automation workflow
+
+### Advanced: Multi-Stage Response
+
+Create escalation workflow:
+
+1. **Stage 1**: Restart container (level 8-10 alerts)
+2. **Stage 2**: Isolate container (level 10-12 alerts)
+3. **Stage 3**: Full shutdown + snapshot (level 12+ alerts)
+4. **Stage 4**: Notify security team + create incident ticket
 ---
 
 ## 👥 Test Accounts
