@@ -74,55 +74,6 @@
 
 ---
 
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Host System (Ubuntu 24.04)                      │
-│                                                                     │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │              Wazuh Agent                                     │  │
-│  │  ┌────────────────────────────────────────────────┐         │  │
-│  │  │  Log Collection & Monitoring                  │         │  │
-│  │  │  • Docker Events                              │         │  │
-│  │  │  • Container Logs                             │         │  │
-│  │  │  • Application Logs                           │         │  │
-│  │  │  • File Integrity Monitoring                  │         │  │
-│  │  └────────────────────────────────────────────────┘         │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                            ↓                                        │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │         Docker Network: vulnbank-lab_bank_network            │  │
-│  │                                                              │  │
-│  │  ┌─────────────────┐      ┌────────────────────┐           │  │
-│  │  │  Web Container  │      │   DB Container     │           │  │
-│  │  │  vulnbank-web   │◄────►│  vulnbank-db       │           │  │
-│  │  │  Django 4.2     │      │  PostgreSQL 15     │           │  │
-│  │  │  Port: 8000     │      │  Port: 5432        │           │  │
-│  │  └─────────────────┘      └────────────────────┘           │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                            ↕                                        │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │              N8N Automation Container                        │  │
-│  │              Port: 5678                                      │  │
-│  │  ┌────────────────────────────────────────────────┐         │  │
-│  │  │  Automated Workflows                          │         │  │
-│  │  │  • Health Check (every 5 min)                 │         │  │
-│  │  │  • Auto-restart on failure                    │         │  │
-│  │  │  • Chat-triggered management                  │         │  │
-│  │  │  • Security incident response                 │         │  │
-│  │  │  • Container isolation/snapshot               │         │  │
-│  │  └────────────────────────────────────────────────┘         │  │
-│  │              ↕                      ↕                        │  │
-│  │      Docker Socket          Telegram/Slack API              │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-                            ↓                    ↑
-                  Wazuh Manager (10.42.0.245)    │
-                  • Rule Processing              │
-                  • Alert Generation    ─────────┘ Webhooks
-                  • Dashboard Visualization
-                  • N8N Integration (alerts → actions)
-```
-
-Or a more detailed version showing all integrations:
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
 │                        Host System (Ubuntu 24.04)                         │
