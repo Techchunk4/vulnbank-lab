@@ -181,12 +181,12 @@ firefox http://localhost:8000
 ![Container Status](screenshots/docker-containers.png)
 *VulnBank running in Docker containers*
 
-### SQL Injection Detection
-![SQL Injection Alert](screenshots/telegram-bot.png)
+### N8N Telegram Bot
+![N8N Telegram Bot Alert Message](screenshots/telegram-bot.png)
 *Wazuh alert triggered by SQL injection attempt*
 
-### Brute Force Detection
-![Brute Force Alert](screenshots/n8n-admin.png)
+### N8N Down Time Detection
+![N8N Down Time Detection](screenshots/n8n-admin.png)
 *Multiple failed login attempts detected by Wazuh*
 
 **Default Login**: `admin` / `admin123`
