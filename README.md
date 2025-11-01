@@ -77,7 +77,7 @@
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
 │                        Host System (Ubuntu 24.04)                         │
-│                   /home/abdelkader-work-station/Documents/vulnbank-lab    │
+│                   /web-server/vulnbank-lab    │
 │                                                                           │
 │  ┌─────────────────────────────────────────────────────────────────────┐ │
 │  │                          Wazuh Agent                                │ │
